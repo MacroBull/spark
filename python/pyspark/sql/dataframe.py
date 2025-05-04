@@ -19,6 +19,7 @@
 
 import sys
 import random
+from contextlib import contextmanager
 from typing import (
     Any,
     Callable,
@@ -1645,6 +1646,43 @@ class DataFrame:
         self.is_cached = False
         self._jdf.unpersist(blocking)
         return self
+
+    @contextmanager
+    def persist_context(
+        self,
+        storageLevel: StorageLevel = (StorageLevel.MEMORY_AND_DISK_DESER),
+    ) -> Iterator["DataFrame"]:
+        """Persist the :class:`DataFrame` duration the context.
+
+        Parameters
+        ----------
+        storageLevel : :class:`StorageLevel`
+            Storage level to set for persistence. Default is MEMORY_AND_DISK_DESER.
+
+        Yields
+        -------
+        :class:`DataFrame`
+            Persisted DataFrame.
+
+        See Also
+        --------
+        DataFrame.persist : Sets the storage level to persist the contents of the :class:`DataFrame`.
+
+        Examples
+        --------
+        >>> df = spark.createDataFrame(
+        ...     [(14, "Tom"), (23, "Alice"), (23, "Bob")], ["age", "name"])
+        >>> df = df.filter(df.age > 18)
+        >>> with df.persist_context():
+        ...     num_names = df.select("name").distinct().count()
+        ...     nun_ages = df.select("age").distinct().count()
+        >>> (num_names, nun_ages)
+        (2, 1)
+        """
+        try:
+            yield self.persist(storageLevel=storageLevel)
+        finally:
+            self.unpersist()
 
     @dispatch_df_method
     def coalesce(self, numPartitions: int) -> "DataFrame":
